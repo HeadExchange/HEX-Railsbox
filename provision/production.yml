@@ -13,9 +13,12 @@
     # Директория установки Rbenv
     rbenv_root: '{{ home }}/.rbenv'
     # Название приложения
-    name: 'REPLACE_ME'
+    name: 'hex'
     # Путь до нашего приложения
     application: '{{ home }}/apps/{{ name }}'
+    # Домен сайта для nginx
+    domain: 'head.exchange'
+    secret_key_base: '7c5a59fbec14fa1983a766b63c28980d2647a528f82b740b27133f91002256a8349b4cda8fb73755867fdebca5984d3f1d0cffe52edb3cefa4329e5b76824a11'
 
   # Список задач, которые будут выполнены последовательно
   tasks:
@@ -126,9 +129,14 @@
       service: name=postgresql state=restarted
       when: 'postgres_login|failed'
 
+    - name: 'postgresql | check shared folder'
+      command: 'test -x {{ application }}/shared'
+      register: 'shared_folder_created'
+      ignore_errors: yes
+
     - name: 'postgresql | create shared directory'
       shell: 'mkdir -p {{ application }}/shared/config -m 775 && chown -R {{ user }}:{{ user }} {{ home }}/apps'
-      when: 'postgres_login|failed'
+      when: 'shared_folder_created|failed'
 
     - name: 'postgresql | copy database.yml'
       template:
@@ -137,13 +145,26 @@
         owner: '{{ user }}'
         group: '{{ user }}'
         mode: '0644'
-      when: 'postgres_login|failed'
+      when: 'shared_folder_created|failed'
 
     - name: 'postgresql | create database'
       shell: 'createdb -U postgres -O postgres -E UTF8 -l en_US.UTF-8 {{ name }}_production'
-      when: 'postgres_login|failed'
+      when: 'shared_folder_created|failed'
 
-    # Установка и настройка веб сервера nginx
+    - name: 'secrets | check'
+      command: 'test -f {{ application }}/shared/config/secrets.yml'
+      register: 'secrets_yml_copied'
+      ignore_errors: yes
+
+    - name: 'secrets | copy secrets.yml'
+      template:
+        src: configs/secrets.yml
+        dest: '{{ application }}/shared/config/secrets.yml'
+        owner: '{{ user }}'
+        group: '{{ user }}'
+        mode: '0644'
+      when: 'secrets_yml_copied|failed'
+
     - name: 'nginx | check config'
       command: 'test -f /etc/nginx/sites-enabled/{{ name }}.conf'
       register: 'nginx_config_copied'
