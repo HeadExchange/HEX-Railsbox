@@ -56,12 +56,8 @@
       # shell - это модуль Ansible, который позволяет выполнять обычные bash команды
       shell: 'mkdir -p {{ home }}/.ssh -m 700 && cp /root/.ssh/authorized_keys {{ home }}/.ssh && chown -R {{ user }}:{{ user }} {{ home }}/.ssh'
 
-    - name: 'account | copy ssh private key'
-      # Модуль copy просто берёт и копирует файл из папки src в папку dest
-      copy: 'src=keys/id_rsa dest={{ home }}/.ssh/id_rsa owner={{ user }} group={{ user }} mode=0600'
-
     - name: 'account | copy ssh public key'
-      copy: 'src=keys/id_rsa.pub dest={{ home }}/.ssh/id_rsa.pub owner={{ user }} group={{ user }} mode=0644'
+      authorized_key: user={{ user }} key="{{ lookup('file', 'keys/id_rsa.pub') }}"
 
     # Устанавливаем ruby-build, rbenv, bundler (шаги взяты из инструкции к установке rbenv)
     - name: 'rbenv | clone repo'
