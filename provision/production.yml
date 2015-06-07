@@ -18,7 +18,7 @@
     application: '{{ home }}/apps/{{ name }}'
     # Домен сайта для nginx
     domain: 'head.exchange'
-    secret_key_base: '7c5a59fbec14fa1983a766b63c28980d2647a528f82b740b27133f91002256a8349b4cda8fb73755867fdebca5984d3f1d0cffe52edb3cefa4329e5b76824a11'
+    secret_key_base: "{{ lookup('password', '/tmp/' + name + '_secret chars=ascii_letters,digits,hexdigits length=128')|lower }}"
 
   # Список задач, которые будут выполнены последовательно
   tasks:
