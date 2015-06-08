@@ -100,6 +100,10 @@
       shell: 'RBENV_ROOT={{ rbenv_root }} PATH="$RBENV_ROOT/bin:$PATH" rbenv exec gem install bundler'
       when: 'ruby_installed|failed'
 
+    - name: 'set default directory for ssh'
+      shell: 'echo "cd /vagrant" >> /home/vagrant/.bashrc'
+      when: 'ruby_installed|failed'
+
     # Устанавливаем posgresql, создаём пользователя, копируем конфиги и создаём конечную базу данных
 #    - name: 'postgresql | check user'
 #      shell: 'psql -U postgres -c "\copyright"'
