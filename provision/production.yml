@@ -2,22 +2,30 @@
 - hosts: 'all'
   remote_user: 'root'
 
+  vars_prompt:
+    - name: "ruby_version"
+      prompt: "Ruby version"
+      default: "2.2.2"
+      private: no
+    - name: "name"
+      prompt: "Application name (one-word, can use '_' symbol)"
+      default: "example_app"
+      private: no
+    - name: "domain"
+      prompt: "Site domain"
+      default: "example.com"
+      private: no
+
   # В данном блоке объявляются переменные, которые будут использоваться в playbook и конфигах, представленных выше
   vars:
-    # Версия ruby
-    ruby_version: '2.2.2'
     # Пользователь, от лица которого будет происходит деплой
     user: 'deployer'
     # Домашняя директория
     home: '/home/{{ user }}'
     # Директория установки Rbenv
     rbenv_root: '{{ home }}/.rbenv'
-    # Название приложения
-    name: 'hex'
     # Путь до нашего приложения
     application: '{{ home }}/apps/{{ name }}'
-    # Домен сайта для nginx
-    domain: 'head.exchange'
     secret_key_base: "{{ lookup('password', '/tmp/' + name + '_secret chars=ascii_letters,digits,hexdigits length=128')|lower }}"
 
   # Список задач, которые будут выполнены последовательно
