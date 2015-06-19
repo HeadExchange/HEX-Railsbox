@@ -30,8 +30,12 @@
 
   # Список задач, которые будут выполнены последовательно
   tasks:
-    # Обновление кеша и установка необходимых пакетов, всего программного обеспечения,
-    # необходимого для работы нашего сервера
+    - name: add node repo
+      apt_repository: repo=ppa:chris-lea/node.js
+
+    - name: install node packages
+      apt: name=nodejs state=latest update_cache=yes
+      
     - name: 'apt | update'
       action: 'apt update_cache=yes'
 
