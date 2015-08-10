@@ -1,0 +1,174 @@
+---
+- hosts: 'all'
+  remote_user: 'root'
+
+  vars_prompt:
+    - name: "ruby_version"
+      prompt: "Ruby version"
+      default: "2.2.2"
+      private: no
+    - name: "swapfile_size"
+      prompt: "Swapfile Size"
+      default: "1G"
+      private: no
+
+  # В данном блоке объявляются переменные, которые будут использоваться в playbook и конфигах, представленных выше
+  vars:
+    # Пользователь, от лица которого будет происходит деплой
+    user: 'deployer'
+    # Домашняя директория
+    home: '/home/{{ user }}'
+    # Директория установки Rbenv
+    rbenv_root: '{{ home }}/.rbenv'
+    # Путь до нашего приложения
+    application: '{{ home }}/apps/{{ name }}'
+    secret_key_base: "{{ lookup('password', '/tmp/' + name + '_secret chars=ascii_letters,digits,hexdigits length=128')|lower }}"
+    swapfile_location: /swapfile
+
+  # Список задач, которые будут выполнены последовательно
+  tasks:
+    # SWAPFILE
+    - name: Write swapfile
+      command: |
+        fallocate -l {{ swapfile_size }} {{ swapfile_location }}
+      register: write_swapfile
+      when: swapfile_size != false
+
+    - name: Set swapfile permissions
+      file: path={{ swapfile_location }} mode=600
+      when: swapfile_size != false
+
+    - name: Create swapfile
+      command: mkswap {{ swapfile_location }}
+      register: create_swapfile
+      when: swapfile_size != false and write_swapfile.changed
+
+    - name: Enable swapfile
+      command: swapon {{ swapfile_location }}
+      when: swapfile_size != false and create_swapfile.changed
+
+    - name: Add swapfile to /etc/fstab
+      lineinfile: dest=/etc/fstab line="{{ swapfile_location }}   none    swap    sw    0   0" state=present
+      when: swapfile_size != false
+
+    - name: Configure vm.swappiness
+      sysctl:
+        name: vm.swappiness
+        value: 10
+        state: present
+        reload: true
+
+    - name: Configure vm.vfs_cache_pressure
+      sysctl:
+        name: vm.vfs_cache_pressure
+        value: 50
+        state: present
+        reload: true
+
+    - name: add node repo
+      apt_repository: repo=ppa:chris-lea/node.js
+
+    - name: install node packages
+      apt: name=nodejs state=latest update_cache=yes
+
+    - name: 'apt | update'
+      action: 'apt update_cache=yes'
+
+    - name: 'apt | install dependencies'
+      action: 'apt pkg={{ item }}'
+      with_items:
+        - 'build-essential'
+        - 'libssl-dev'
+        - 'libyaml-dev'
+        - 'libreadline6-dev'
+        - 'zlib1g-dev'
+        - 'libcurl4-openssl-dev'
+        - 'git'
+        - 'nginx'
+        - 'redis-server'
+        - 'postgresql'
+        - 'postgresql-contrib'
+        - 'libpq-dev'
+        - 'imagemagick'
+        - 'libmagickwand-dev'
+        - 'nodejs'
+        - 'htop'
+        - mc
+
+    # Создаём нашего пользователя deploy, копируем авторизационный ключ,
+    # а так же публичный и приватный ssh ключи
+    - name: 'account | create'
+      user: 'name={{ user }} shell=/bin/bash'
+
+    - name: 'account | copy authorized keys'
+      # shell - это модуль Ansible, который позволяет выполнять обычные bash команды
+      shell: 'mkdir -p {{ home }}/.ssh -m 700 && cp /root/.ssh/authorized_keys {{ home }}/.ssh && chown -R {{ user }}:{{ user }} {{ home }}/.ssh'
+
+    - name: 'account | copy ssh public key'
+      authorized_key: user={{ user }} key="{{ lookup('file', 'keys/id_rsa.pub') }}"
+
+    # Устанавливаем ruby-build, rbenv, bundler (шаги взяты из инструкции к установке rbenv)
+    - name: 'rbenv | clone repo'
+      git: 'repo=git://github.com/sstephenson/rbenv.git dest={{ rbenv_root }} accept_hostkey=yes'
+
+    - name: 'rbenv | check ruby-build installed'
+      command: 'test -x {{ rbenv_root }}/plugins/ruby-build'
+      # Мы проверяем, установлен ли ruby-build и регистрируем событие plugin_installed,
+      # а затем выполняем все остальные шаги, которые не были изменены при следующем прогоне плейбука
+      register: 'plugin_installed'
+      ignore_errors: yes
+
+    - name: 'rbenv | add bin to path'
+      shell: echo 'export PATH="$HOME/.rbenv/bin:$PATH"' >> {{ home }}/.bashrc
+      when: 'plugin_installed|failed'
+
+    - name: 'rbenv | init'
+      shell: echo 'eval "$(rbenv init -)"' >> {{ home }}/.bashrc
+      when: 'plugin_installed|failed'
+
+    - name: 'rbenv | clone ruby-build repo'
+      git: 'repo=git://github.com/sstephenson/ruby-build.git dest={{ rbenv_root }}/plugins/ruby-build accept_hostkey=yes'
+      when: 'plugin_installed|failed'
+
+    - name: 'rbenv | check ruby {{ ruby_version }} installed'
+      shell: 'RBENV_ROOT={{ rbenv_root }} PATH="$RBENV_ROOT/bin:$PATH" rbenv versions | grep {{ ruby_version }}'
+      register: 'ruby_installed'
+      ignore_errors: yes
+
+    - name: 'rbenv | install ruby {{ ruby_version }}'
+      shell: 'RBENV_ROOT={{ rbenv_root }} PATH="$RBENV_ROOT/bin:$PATH" rbenv install {{ ruby_version }}'
+      when: 'ruby_installed|failed'
+
+    - name: 'rbenv | set global ruby {{ ruby_version }}'
+      shell: 'RBENV_ROOT={{ rbenv_root }} PATH="$RBENV_ROOT/bin:$PATH" rbenv global {{ ruby_version }}'
+      when: 'ruby_installed|failed'
+
+    - name: 'rbenv | rehash'
+      shell: 'RBENV_ROOT={{ rbenv_root }} PATH="$RBENV_ROOT/bin:$PATH" rbenv rehash'
+      when: 'ruby_installed|failed'
+
+    - name: 'rbenv | create .gemrc'
+      lineinfile: 'dest={{ home }}/.gemrc owner={{ user }} group={{ user }} mode=0644 line="gem: --no-ri --no-rdoc" create=yes'
+      when: 'ruby_installed|failed'
+
+    - name: 'ruby | install bundler'
+      shell: 'RBENV_ROOT={{ rbenv_root }} PATH="$RBENV_ROOT/bin:$PATH" rbenv exec gem install bundler'
+      when: 'ruby_installed|failed'
+
+    - name: 'rbenv | change owner'
+      shell: 'chown -R {{ user }}:{{ user }} {{ rbenv_root }}'
+      when: 'ruby_installed|failed'
+
+    # Устанавливаем posgresql, создаём пользователя, копируем конфиги и создаём конечную базу данных
+    - name: 'postgresql | check user'
+      shell: 'psql -U postgres -c "\copyright"'
+      register: 'postgres_login'
+      ignore_errors: yes
+
+    - name: 'postgresql | set auth type'
+      copy: 'src=configs/pg_hba.conf dest=/etc/postgresql/9.3/main/pg_hba.conf owner=postgres group=postgres mode=0644'
+      when: 'postgres_login|failed'
+
+    - name: 'postgresql | restart service'
+      service: name=postgresql state=restarted
+      when: 'postgres_login|failed'

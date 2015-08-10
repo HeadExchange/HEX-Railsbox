@@ -1,0 +1,82 @@
+---
+- hosts: 'all'
+  remote_user: 'root'
+
+  vars_prompt:
+    - name: "name"
+      prompt: "Application name (one-word, can use '_' symbol)"
+      default: "example_app"
+      private: no
+    - name: "domain"
+      prompt: "Site domain"
+      default: "example.com"
+      private: no
+
+  # В данном блоке объявляются переменные, которые будут использоваться в playbook и конфигах, представленных выше
+  vars:
+    # Пользователь, от лица которого будет происходит деплой
+    user: 'deployer'
+    # Домашняя директория
+    home: '/home/{{ user }}'
+    # Директория установки Rbenv
+    rbenv_root: '{{ home }}/.rbenv'
+    # Путь до нашего приложения
+    application: '{{ home }}/apps/{{ name }}'
+    secret_key_base: "{{ lookup('password', '/tmp/' + name + '_secret chars=ascii_letters,digits,hexdigits length=128')|lower }}"
+    swapfile_location: /swapfile
+
+  # Список задач, которые будут выполнены последовательно
+  tasks:
+    - name: 'postgresql | check shared folder'
+      command: 'test -x {{ application }}/shared'
+      register: 'shared_folder_created'
+      ignore_errors: yes
+
+    - name: 'postgresql | create shared directory'
+      shell: 'mkdir -p {{ application }}/shared/config -m 775 && chown -R {{ user }}:{{ user }} {{ home }}/apps'
+      when: 'shared_folder_created|failed'
+
+    - name: 'postgresql | copy database.yml'
+      template:
+        src: configs/database.yml
+        dest: '{{ application }}/shared/config/database.yml'
+        owner: '{{ user }}'
+        group: '{{ user }}'
+        mode: '0644'
+      when: 'shared_folder_created|failed'
+
+    - name: 'postgresql | create database'
+      shell: 'createdb -U postgres -O postgres -E UTF8 -l en_US.UTF-8 {{ name }}_production'
+      when: 'shared_folder_created|failed'
+
+    - name: 'secrets | check'
+      command: 'test -f {{ application }}/shared/config/secrets.yml'
+      register: 'secrets_yml_copied'
+      ignore_errors: yes
+
+    - name: 'secrets | copy secrets.yml'
+      template:
+        src: configs/secrets.yml
+        dest: '{{ application }}/shared/config/secrets.yml'
+        owner: '{{ user }}'
+        group: '{{ user }}'
+        mode: '0644'
+      when: 'secrets_yml_copied|failed'
+
+    - name: 'nginx | check config'
+      command: 'test -f /etc/nginx/sites-enabled/{{ name }}.conf'
+      register: 'nginx_config_copied'
+      ignore_errors: yes
+
+    - name: 'nginx | createdir'
+      shell: 'rm /etc/nginx/sites-enabled/default; mkdir -p /etc/nginx/sites-enabled/'
+      when: 'nginx_config_copied|failed'
+
+    - name: 'nginx | copy config'
+      template: 'src=configs/nginx.conf dest=/etc/nginx/sites-enabled/{{ name }}.conf owner=root group=root mode=0644'
+      when: 'nginx_config_copied|failed'
+
+    - name: 'nginx | restart service'
+      # Модуль service - это ещё одна удобная обёртка, указываем какой сервис и что с ним необходимо сделать
+      service: name=nginx state=restarted
+      when: 'nginx_config_copied|failed'

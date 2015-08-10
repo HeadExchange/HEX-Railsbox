@@ -46,6 +46,13 @@
 * имя приложение
 * домен сайта приложения
 
+Если нужна только инициализация сервера, выполняем:
+
+```ansible-playbook -i46.78.90.111, production-init.yml```
+
+Если нужна только настройка окружения для приложения, выполняем:
+
+```ansible-playbook -i46.78.90.111, production-app.yml```
 
 За основу взяты статьи:
 * https://mkdev.me/posts/nastroyka-i-deploy-rails-prilozheniy-pri-pomoschi-ansible-i-capistrano
