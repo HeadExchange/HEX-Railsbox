@@ -80,3 +80,39 @@
       # Модуль service - это ещё одна удобная обёртка, указываем какой сервис и что с ним необходимо сделать
       service: name=nginx state=restarted
       when: 'nginx_config_copied|failed'
+
+    - name: 'puma | check script'
+      stat: path=/etc/init/puma.conf
+      register: puma_st
+
+    - name: 'puma | copy script if not exists'
+      template:
+        src: configs/puma.conf
+        dest: /etc/init/puma.conf
+      when: puma_st.stat.exists == False
+
+    - name: 'puma | check manager script'
+      stat: path=/etc/init/puma-manager.conf
+      register: puma_manager_st
+
+    - name: 'puma | copy manager script if not exists'
+      template:
+        src: configs/puma-manager.conf
+        dest: /etc/init/puma-manager.conf
+      when: not puma_manager_st.stat.exists
+
+    - name: 'puma | check puma apps list'
+      stat: path=/etc/puma.conf
+      register: puma_apps_st
+
+    - name: 'puma | create puma apps list if not exists'
+      file:
+        path: /etc/puma.conf
+        state: touch
+      when: puma_apps_st.stat.exists == False
+
+    - name: 'puma | add app to puma apps list'
+      lineinfile:
+        dest: /etc/puma.conf
+        line: '{{ application }}/current'
+        state: present
