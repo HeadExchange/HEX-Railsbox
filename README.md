@@ -54,6 +54,27 @@
 
 ```ansible-playbook -i46.78.90.111, production-app.yml```
 
+### Puma auto start
+
+Для того, чтобы приложение корректно стартовало после перезапуска сервера, нужно в `deploy.rb` добавить следующие строки:
+
+```ruby
+set :puma_init_active_record, true
+set :puma_conf, -> { File.join(shared_path, 'config', 'puma.rb') }
+```
+
+Также проследить, что создавалась символьная ссылка на файл конфигурации
+
+```ruby
+set :linked_files, fetch(:linked_files, []).push('config/database.yml', 'config/secrets.yml', 'config/puma.rb')
+```
+
+Перед деплоем выполнить
+
+```
+cap production puma:config
+```
+
 За основу взяты статьи:
 * https://mkdev.me/posts/nastroyka-i-deploy-rails-prilozheniy-pri-pomoschi-ansible-i-capistrano
 * http://habrahabr.ru/company/selectel/blog/196620/
