@@ -5,7 +5,7 @@
   vars_prompt:
     - name: "ruby_version"
       prompt: "Ruby version"
-      default: "2.2.2"
+      default: "2.2.3"
       private: no
     - name: "swapfile_size"
       prompt: "Swapfile Size"
@@ -28,15 +28,21 @@
   # Список задач, которые будут выполнены последовательно
   tasks:
     # SWAPFILE
+    - name: SWAP | check
+      shell: swapon -s
+      register: swapon_contents
+
     - name: Write swapfile
       command: |
         fallocate -l {{ swapfile_size }} {{ swapfile_location }}
       register: write_swapfile
-      when: swapfile_size != false
+      when: swapon_contents.stdout.find('{{ swapfile_location }}') == -1 and
+            swapfile_size != false
 
     - name: Set swapfile permissions
       file: path={{ swapfile_location }} mode=600
-      when: swapfile_size != false
+      when: swapon_contents.stdout.find('{{ swapfile_location }}') == -1 and
+            swapfile_size != false
 
     - name: Create swapfile
       command: mkswap {{ swapfile_location }}
