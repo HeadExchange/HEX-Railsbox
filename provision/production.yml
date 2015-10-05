@@ -32,13 +32,18 @@
     application: '{{ home }}/apps/{{ name }}'
     secret_key_base: "{{ lookup('password', '/tmp/' + name + '_secret chars=ascii_letters,digits,hexdigits length=128')|lower }}"
     swapfile_location: /swapfile
+    swapfile_use_dd: False
 
   # Список задач, которые будут выполнены последовательно
   tasks:
     # SWAPFILE
     - name: Write swapfile
       command: |
-        fallocate -l {{ swapfile_size }} {{ swapfile_location }}
+        {% if swapfile_use_dd %}
+        dd if=/dev/zero of={{ swapfile_location }} bs=1M count={{ swapfile_size }} creates={{ swapfile_location }}
+        {% else %}
+        fallocate -l {{ swapfile_size }} {{ swapfile_location }} creates={{ swapfile_location }}
+        {% endif %}
       register: write_swapfile
       when: swapfile_size != false
 
