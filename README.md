@@ -1,5 +1,10 @@
 # HEX-Railsbox
 
+## Setup
+
+Если у вас не установлен ansible
+```brew install ansible```
+
 ## Development
 
 Для развёртывания виртальной машины, аналогичной серверу приложения, нужно скопировать папку ```provision``` и ```Vagrantfile``` в папку проекта.
