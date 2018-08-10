@@ -5,7 +5,7 @@
   vars_prompt:
     - name: "ruby_version"
       prompt: "Ruby version"
-      default: "2.2.3"
+      default: "2.3.0"
       private: no
     - name: "swapfile_size"
       prompt: "Swapfile Size"
