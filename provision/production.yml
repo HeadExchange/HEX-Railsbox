@@ -86,32 +86,36 @@
     # - name: add node repo
       # apt_repository: repo=ppa:chris-lea/node.js
 
-    - name: install node packages
-      apt: name=nodejs state=latest update_cache=yes
+    # - name: install node packages
+      # apt: name=nodejs state=latest update_cache=yes
 
     - name: 'apt | update'
       action: 'apt update_cache=yes'
 
     - name: 'apt | install dependencies'
-      action: 'apt pkg={{ item }}'
+      apt: name={{item}} state=installed
       with_items:
-        - 'build-essential'
-        - 'libssl-dev'
-        - 'libyaml-dev'
-        - 'libreadline6-dev'
-        - 'zlib1g-dev'
-        - 'libcurl4-openssl-dev'
-        - 'git'
-        - 'nginx'
-        - 'redis-server'
-        - 'postgresql'
-        - 'postgresql-contrib'
-        - 'libpq-dev'
-        - 'imagemagick'
-        - 'libmagickwand-dev'
-        - 'nodejs'
-        - 'htop'
+        - build-essential
+        - libssl-dev
+        - libyaml-dev
+        - libreadline6-dev
+        - zlib1g-dev
+        - libcurl4-openssl-dev
+        - git
+        - nginx
+        - redis-server
+        - postgresql
+        - postgresql-contrib
+        - libpq-dev
+        - imagemagick
+        - libmagickwand-dev
+        - nodejs
+        - npm
+        - yarn
+        - htop
         - mc
+        - libssl1.0-dev
+        # For legacy Ruby < 2.4
 
     # Создаём нашего пользователя deploy, копируем авторизационный ключ,
     # а так же публичный и приватный ssh ключи
