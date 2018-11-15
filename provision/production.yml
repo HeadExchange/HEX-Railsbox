@@ -6,7 +6,7 @@
   vars_prompt:
     - name: "ruby_version"
       prompt: "Ruby version"
-      default: "2.5.1"
+      default: "2.5.3"
       private: no
     - name: "name"
       prompt: "Application name (one-word, can use '_' symbol)"
@@ -152,13 +152,18 @@
       git: 'repo=git://github.com/sstephenson/ruby-build.git dest={{ rbenv_root }}/plugins/ruby-build accept_hostkey=yes'
       when: 'plugin_installed is failed'
 
+    - name: 'rbenv | pull ruby-build repo'
+      shell: |
+        cd {{ rbenv_root }}/plugins/ruby-build
+        git pull origin master
+
     - name: 'rbenv | check ruby {{ ruby_version }} installed'
       shell: 'RBENV_ROOT={{ rbenv_root }} PATH="$RBENV_ROOT/bin:$PATH" rbenv versions | grep {{ ruby_version }}'
       register: 'ruby_installed'
       ignore_errors: yes
 
     - name: 'rbenv | install ruby {{ ruby_version }}'
-      shell: 'RBENV_ROOT={{ rbenv_root }} PATH="$RBENV_ROOT/bin:$PATH" rbenv install {{ ruby_version }}'
+      shell: 'RBENV_ROOT={{ rbenv_root }} PATH="$RBENV_ROOT/bin:$PATH" rbenv install --verbose {{ ruby_version }}'
       when: 'ruby_installed is failed'
 
     - name: 'rbenv | set global ruby {{ ruby_version }}'
@@ -214,7 +219,7 @@
       when: 'shared_folder_created is failed'
 
     - name: 'postgresql | create database'
-      shell: 'createdb -U postgres -O postgres -E UTF8 -l en_US.UTF-8 {{ name }}_production'
+      shell: 'createdb -U postgres -O postgres -E UTF8 -l en_US.UTF-8 -T template0 {{ name }}_production'
       when: 'shared_folder_created is failed'
 
     - name: 'secrets | check'
