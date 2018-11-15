@@ -117,6 +117,10 @@
         - libssl1.0-dev
         # For legacy Ruby < 2.4
 
+    # Не протестировано
+    - name: 'yarn | install globally'
+      shell: 'npm install yarn -g'
+
     # Создаём нашего пользователя deploy, копируем авторизационный ключ,
     # а так же публичный и приватный ssh ключи
     - name: 'account | create'
