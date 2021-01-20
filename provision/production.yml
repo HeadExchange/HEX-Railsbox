@@ -235,19 +235,23 @@
       shell: "createdb -U postgres -O postgres -E UTF8 -l en_US.UTF-8 -T template0 {{ name }}_production"
       when: "shared_folder_created is failed"
 
-    - name: "secrets | check"
-      command: "test -f {{ application }}/shared/config/secrets.yml"
-      register: "secrets_yml_copied"
+    - name: 'secrets | create credentials folder'
+      shell: 'mkdir -p {{ application }}/shared/config/credentials -m 775'
+      when: 'credentials_folder_created is failed'
+
+    - name: 'secrets | check production.key'
+      command: 'test -f {{ application }}/shared/config/credentials/production.key'
+      register: 'production_key_copied'
       ignore_errors: yes
 
-    - name: "secrets | copy secrets.yml"
+    - name: 'secrets | copy production.key'
       template:
-        src: configs/secrets.yml
-        dest: "{{ application }}/shared/config/secrets.yml"
-        owner: "{{ user }}"
-        group: "{{ user }}"
-        mode: "0644"
-      when: "secrets_yml_copied is failed"
+        src: ../../config/credentials/production.key
+        dest: '{{ application }}/shared/config/creadentials/production.key'
+        owner: '{{ user }}'
+        group: '{{ user }}'
+        mode: '0644'
+      when: 'production_key_copied is failed'
 
     - name: "nginx | check config"
       command: "test -f /etc/nginx/sites-enabled/{{ name }}.conf"
