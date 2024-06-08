@@ -49,8 +49,9 @@ cd HEX-Railsbox/provision
 ansible-playbook -iIP_ADDRESS, production.yml
 ```
 
-If you use Capistrano, after this just call it do the rest.
+If you use Capistrano, after this just change directory to your app root and call Capistrno to do the rest.
 
 ```bash
+cd ../..
 cap production deploy
 ```
