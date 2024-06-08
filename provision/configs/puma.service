@@ -1,0 +1,26 @@
+#Modify the path to the app directory and the user and group. 
+[Unit]
+Description=Puma HTTP Server
+After=network.target
+# Uncomment for socket activation (see below)
+# Requires=puma.socket
+[Service]
+# Foreground process (do not use --daemon in ExecStart or config.rb)
+Type=simple
+# Preferably configure a non-privileged user
+User=deployer
+# Group=deployer
+# Specify the path to your puma application root
+WorkingDirectory=/home/deployer/apps/{{ name }}/current
+# Helpful for debugging socket activation, etc.
+# Environment=PUMA_DEBUG=1
+# EnvironmentFile=/home/deployer/apps/{{ name }}/.env
+# The command to start Puma
+# ExecStart=/sbin/puma -b tcp://0.0.0.0:9292 -b ssl://0.0.0.0:9293?key=key.pem&cert=cert.pem
+# ExecStart=/usr/local/bin/bundle exec --keep-file-descriptors puma -e production
+# ExecStart=/usr/local/bin/puma -C /home/deployer/{{ name }}/config/puma.rb
+ExecStart=/home/deployer/.rbenv/shims/bundle exec puma -e production -C ./config/puma.rb config.ru
+PIDFile=/home/deployer/apps/{{ name }}/shared/tmp/pids/puma.pid
+Restart=always
+[Install]
+WantedBy=multi-user.target
