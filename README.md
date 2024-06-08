@@ -1,89 +1,56 @@
 # HEX-Railsbox
 
-## Setup
+Setup Ubuntu server with Ruby On Rails, PostgreSQL and Redis
 
-Если у вас не установлен ansible
-```brew install ansible```
+## Before use
 
-## Development
+### Install Ansible on your machine
 
-Для развёртывания виртальной машины, аналогичной серверу приложения, нужно скопировать папку ```provision``` и ```Vagrantfile``` в папку проекта.
-
-В папке проекта выполнить команду:
-
-```vagrant up```
-
-И пойти пить чай. Пока вы пьёте чай, скачается образ Ubuntu, соответсвующий установленному на сервере, установятся все необходимые пакеты, правильная версия Ruby.
-
-После всего свершившегося можно зайти на виртуалку командой
-
-``` vagrant ssh ```
-
-и запустить установку гемов
-
-``` bundle install ```
-
-и продолжить пить чай.
-
-Пред запуском приложения запустить миграции и остальное что нужно для приложения.
-
-Приложение же запускать командой
-
-``` rails server -b 0.0.0.0 ```
-
-Это для версий ```rails >= 4.2```, т.к. в ней по умолчанию сервер запускается с адресом localhost (127.0.0.1) из-за чего приложение не может быть доступно из вне (из ваше ОС, где вы эту виртуалку создали). В более младших версиях ``` rails ``` приложение по-умолчанию запускается с адресом ```0.0.0.0```.
-
-## Production
-
-Данный инструмент устанавливает все необходимые пакеты в Ubuntu, настраивает PostgreSQL, создаёт папку для проекта и файлы database.yml и secrets.yml
-
-Для установки нужно склонировать репо себе в папку.
-Добавить в папку keys свой публичный ключ.
-
-Затем в командной строке переходим в каталог ```provision``` и выполняем команду
-
-```ansible-playbook -i46.78.90.111, production.yml```
-
-Где ```46.78.90.111``` нужно заменить на IP-адрес сервера на который будет производиться деплой.
-
-В начале выполнения нужно будет ввести желаемые
-* версию руби
-* имя приложение
-* домен сайта приложения
-
-Если нужна только инициализация сервера, выполняем:
-
-```ansible-playbook -i46.78.90.111, production-init.yml```
-
-Если нужна только настройка окружения для приложения, выполняем:
-
-```ansible-playbook -i46.78.90.111, production-app.yml```
-
-Если нужно только добавить скрипты автостарта puma (не забудьте обновить `deploy.rb` по инструкции ниже):
-
-```ansible-playbook -i46.78.90.111, production-puma.yml```
-
-### Puma auto start
-
-Для того, чтобы приложение корректно стартовало после перезапуска сервера, нужно в `deploy.rb` добавить следующие строки:
-
-```ruby
-set :puma_init_active_record, true
-set :puma_conf, -> { File.join(shared_path, 'config', 'puma.rb') }
+```bash
+brew install ansible
 ```
 
-Также проследить, что создавалась символьная ссылка на файл конфигурации
+### Get the root access to your virtual machine via ssh key
 
-```ruby
-set :linked_files, fetch(:linked_files, []).push('config/database.yml', 'config/secrets.yml', 'config/puma.rb')
+You should have the root access to the virtual machine you want to setup. If not just login as you can and setup the root access.
+
+```bash
+ssh username@ip_address
+sudo nano /root/.ssh/authorized_keys
+# paste your public key
+
+sudo nano /etc/ssh/sshd_config
+# add next line to the bottom of the file without hash symbol
+# PermitRootLogin yes
+
+sudo passwd root
+# create new root password
+
+sudo systemctl restart ssh
+logout
 ```
 
-Перед деплоем выполнить
+### Clone this repo to your Rails project
 
-```
-cap production puma:config
+```bash
+git clone git@github.com:HeadExchange/HEX-Railsbox.git
 ```
 
-За основу взяты статьи:
-* https://mkdev.me/posts/nastroyka-i-deploy-rails-prilozheniy-pri-pomoschi-ansible-i-capistrano
-* http://habrahabr.ru/company/selectel/blog/196620/
+### Prepare your ssh key
+
+Get the ssh public key you use, copy and paste it to HEX-Railsbox/provision/keys folder
+
+## Production setup
+
+Change directory to provision folder and start Ansible. In code below change IP_ADDRESS to your virtual machine real IP address.
+
+```bash
+cd HEX-Railsbox/provision
+ansible-playbook -iIP_ADDRESS, production.yml
+```
+
+If you use Capistrano, after this just call it do the rest.
+
+```bash
+cap production deploy
+```

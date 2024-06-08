@@ -4,44 +4,35 @@
   gather_facts: no
 
   vars_prompt:
-    - name: "ruby_version"
-      prompt: "Ruby version"
-      default: "2.5.3"
+    - name: 'ruby_version'
+      prompt: 'Ruby version'
+      default: '3.2.4'
       private: no
-    - name: "name"
+    - name: 'name'
       prompt: "Application name (one-word, can use '_' symbol)"
-      default: "example_app"
+      default: 'first_app'
       private: no
-    - name: "domain"
-      prompt: "Site domain"
-      default: "example.com"
+    - name: 'domain'
+      prompt: 'Site domain'
+      default: 'localhost'
       private: no
-    - name: "swapfile_size"
-      prompt: "Swapfile Size"
-      default: "1G"
+    - name: 'swapfile_size'
+      prompt: 'Swapfile Size'
+      default: '1G'
       private: no
 
-  # В данном блоке объявляются переменные, которые будут использоваться в playbook и конфигах, представленных выше
   vars:
-    # Пользователь, от лица которого будет происходит деплой
     user: 'deployer'
-    # Домашняя директория
     home: '/home/{{ user }}'
-    # Директория установки Rbenv
     rbenv_root: '{{ home }}/.rbenv'
-    # Путь до нашего приложения
     application: '{{ home }}/apps/{{ name }}'
-    secret_key_base: "{{ lookup('password', '/tmp/' + name + '_secret chars=ascii_letters,digits,hexdigits length=128')|lower }}"
     swapfile_location: /swapfile
     swapfile_use_dd: False
 
-  pre_tasks:
-    - name: 'install python2'
-      raw: sudo apt-get -y install python
-
-  # Список задач, которые будут выполнены последовательно
   tasks:
-    # SWAPFILE
+    # ====================================================
+    # Swapfile
+    # ====================================================
     - name: Write swapfile
       command: |
         {% if swapfile_use_dd %}
@@ -83,64 +74,71 @@
         state: present
         reload: true
 
-    # - name: add node repo
-      # apt_repository: repo=ppa:chris-lea/node.js
-
-    # - name: install node packages
-      # apt: name=nodejs state=latest update_cache=yes
-
+    # ====================================================
+    # Ubuntu update and packages installation
+    # ====================================================
     - name: 'apt | update'
       action: 'apt update_cache=yes'
 
     - name: 'apt | install dependencies'
-      apt: name={{item}} state=installed
-      with_items:
-        - build-essential
-        - libssl-dev
-        - libyaml-dev
-        - libreadline6-dev
-        - zlib1g-dev
-        - libcurl4-openssl-dev
-        - git
-        - nginx
-        - redis-server
-        - postgresql
-        - postgresql-contrib
-        - libpq-dev
-        - imagemagick
-        - libmagickwand-dev
-        - nodejs
-        - npm
-        - yarn
-        - htop
-        - mc
-        - libssl1.0-dev
-        # For legacy Ruby < 2.4
+      apt:
+        pkg:
+          - build-essential
+          - libyaml-dev
+          - libreadline6-dev
+          - zlib1g-dev
+          - curl
+          - git
+          - nginx
+          - redis-server
+          - postgresql
+          - postgresql-contrib
+          - libpq-dev
+          - imagemagick
+          - libmagickwand-dev
+          - nodejs
+          - node-gyp
+          - npm
+          - yarn
+          - htop
+          - mc
+        state: present
 
-    # Не протестировано
+    # ====================================================
+    # Set yarn and npm globally
+    # ====================================================
     - name: 'yarn | install globally'
       shell: 'npm install yarn -g'
 
-    # Создаём нашего пользователя deploy, копируем авторизационный ключ,
-    # а так же публичный и приватный ssh ключи
+    - name: 'npm cache clean'
+      shell: 'sudo npm cache clean -f'
+
+    - name: 'npm install n'
+      shell: 'sudo npm install -g n'
+
+    - name: 'upgrade node'
+      shell: 'sudo n stable'
+
+    # ====================================================
+    # Create and setup a deployer user
+    # ====================================================
     - name: 'account | create'
       user: 'name={{ user }} shell=/bin/bash'
 
     - name: 'account | copy authorized keys'
-      # shell - это модуль Ansible, который позволяет выполнять обычные bash команды
       shell: 'mkdir -p {{ home }}/.ssh -m 700 && cp /root/.ssh/authorized_keys {{ home }}/.ssh && chown -R {{ user }}:{{ user }} {{ home }}/.ssh'
 
     - name: 'account | copy ssh public key'
       authorized_key: user={{ user }} key="{{ lookup('file', 'keys/id_rsa.pub') }}"
 
-    # Устанавливаем ruby-build, rbenv, bundler (шаги взяты из инструкции к установке rbenv)
+    # ====================================================
+    # rbenv, ruby-build and ruby setup
+    # ====================================================
     - name: 'rbenv | clone repo'
-      git: 'repo=git://github.com/sstephenson/rbenv.git dest={{ rbenv_root }} accept_hostkey=yes'
+      git: 'repo=https://github.com/rbenv/rbenv.git dest={{ rbenv_root }} accept_hostkey=yes'
 
     - name: 'rbenv | check ruby-build installed'
       command: 'test -x {{ rbenv_root }}/plugins/ruby-build'
-      # Мы проверяем, установлен ли ruby-build и регистрируем событие plugin_installed,
-      # а затем выполняем все остальные шаги, которые не были изменены при следующем прогоне плейбука
       register: 'plugin_installed'
       ignore_errors: yes
 
@@ -153,7 +151,7 @@
       when: 'plugin_installed is failed'
 
     - name: 'rbenv | clone ruby-build repo'
-      git: 'repo=git://github.com/sstephenson/ruby-build.git dest={{ rbenv_root }}/plugins/ruby-build accept_hostkey=yes'
+      git: 'repo=https://github.com/rbenv/ruby-build.git dest={{ rbenv_root }}/plugins/ruby-build accept_hostkey=yes'
       when: 'plugin_installed is failed'
 
     - name: 'rbenv | pull ruby-build repo'
@@ -190,14 +188,16 @@
       shell: 'chown -R {{ user }}:{{ user }} {{ rbenv_root }}'
       when: 'ruby_installed is failed'
 
-    # Устанавливаем posgresql, создаём пользователя, копируем конфиги и создаём конечную базу данных
+    # ====================================================
+    # Create and setup postgresql database
+    # ====================================================
     - name: 'postgresql | check user'
       shell: 'psql -U postgres -c "\copyright"'
       register: 'postgres_login'
       ignore_errors: yes
 
     - name: 'postgresql | set auth type'
-      copy: 'src=configs/pg_hba.conf dest=/etc/postgresql/9.3/main/pg_hba.conf owner=postgres group=postgres mode=0644'
+      copy: 'src=configs/pg_hba.conf dest=/etc/postgresql/16/main/pg_hba.conf owner=postgres group=postgres mode=0644'
       when: 'postgres_login is failed'
 
     - name: 'postgresql | restart service'
@@ -226,20 +226,80 @@
       shell: 'createdb -U postgres -O postgres -E UTF8 -l en_US.UTF-8 -T template0 {{ name }}_production'
       when: 'shared_folder_created is failed'
 
-    - name: 'secrets | check'
-      command: 'test -f {{ application }}/shared/config/secrets.yml'
-      register: 'secrets_yml_copied'
+    # ====================================================
+    # Setup all shared config files, secrets, keys, etc
+    # ====================================================
+    - name: 'secrets | check master.key'
+      command: 'test -f {{ application }}/shared/config/master.key'
+      register: 'mater_key_copied'
       ignore_errors: yes
 
-    - name: 'secrets | copy secrets.yml'
+    - name: 'secrets | copy master.key'
       template:
-        src: configs/secrets.yml
-        dest: '{{ application }}/shared/config/secrets.yml'
+        src: ../../config/master.key
+        dest: '{{ application }}/shared/config/master.key'
         owner: '{{ user }}'
         group: '{{ user }}'
         mode: '0644'
-      when: 'secrets_yml_copied is failed'
+      when: 'mater_key_copied is failed'
 
+    - name: 'secrets | check credentials'
+      command: 'test -f {{ application }}/shared/config/credentials.yml.enc'
+      register: 'credentials_key_copied'
+      ignore_errors: yes
+
+    - name: 'secrets | copy credentials'
+      template:
+        src: ../../config/credentials.yml.enc
+        dest: '{{ application }}/shared/config/credentials.yml.enc'
+        owner: '{{ user }}'
+        group: '{{ user }}'
+        mode: '0644'
+      when: 'credentials_key_copied is failed'
+
+    # ====================================================
+    # sudo access without password for deployer
+    # ====================================================
+    - name: 'sudoers | add rules'
+      shell: |
+        echo '%deployer ALL=NOPASSWD:/bin/systemctl start puma_{{ name }}_production' >> /etc/sudoers
+        echo '%deployer ALL=NOPASSWD:/bin/systemctl stop puma_{{ name }}_production' >> /etc/sudoers
+        echo '%deployer ALL=NOPASSWD:/bin/systemctl restart puma_{{ name }}_production' >> /etc/sudoers
+
+    # ====================================================
+    # grant permission to deployer folder for nginx
+    # ====================================================
+    - name: 'deployer folder | add permissions'
+      shell: 'chmod o=rx /home/deployer'
+
+    # ====================================================
+    # Puma service and app configs setup
+    # ====================================================
+    - name: 'puma | check servise config'
+      command: 'test -f /etc/systemd/system/puma_{{ name }}_production.service'
+      register: 'puma_servise_config_copied'
+      ignore_errors: yes
+
+    - name: 'puma | copy servise config'
+      template: 'src=configs/puma.servise dest=/etc/systemd/system/puma_{{ name }}_production.service owner=root group=root mode=0644'
+      when: 'puma_servise_config_copied is failed'
+
+    - name: 'puma | start servise'
+      shell: 'sudo /bin/systemctl start puma_{{ name }}_production'
+      when: 'puma_servise_config_copied is failed'
+
+    - name: 'puma | check app config'
+      command: 'test -f {{ application }}/shared/config/puma.rb'
+      register: 'puma_app_config_copied'
+      ignore_errors: yes
+
+    - name: 'puma | copy app config'
+      template: 'src=configs/puma.rb dest={{ application }}/shared/config/puma.rb owner=root group=root mode=0644'
+      when: 'puma_app_config_copied is failed'
+
+    # ====================================================
+    # NGINX config setup
+    # ====================================================
     - name: 'nginx | check config'
       command: 'test -f /etc/nginx/sites-enabled/{{ name }}.conf'
       register: 'nginx_config_copied'
@@ -254,6 +314,5 @@
       when: 'nginx_config_copied is failed'
 
     - name: 'nginx | restart service'
-      # Модуль service - это ещё одна удобная обёртка, указываем какой сервис и что с ним необходимо сделать
       service: name=nginx state=restarted
       when: 'nginx_config_copied is failed'
