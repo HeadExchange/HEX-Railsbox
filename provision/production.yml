@@ -30,6 +30,14 @@
     swapfile_use_dd: False
 
   tasks:
+    - name: 'ssh | set keep alive settings'
+      shell: |
+        echo '  ServerAliveInterval 60' >> /etc/ssh/ssh_config
+        echo '  ServerAliveCountMax 30' >> /etc/ssh/ssh_config
+
+    - name: 'ssh | restart ssh service'
+      shell: 'systemctl restart ssh'
+
     # ====================================================
     # Swapfile
     # ====================================================
@@ -134,8 +142,17 @@
     # ====================================================
     # rbenv, ruby-build and ruby setup
     # ====================================================
+    - name: 'rbenv | check rbenv installed'
+      command: 'test -x {{ rbenv_root }}'
+      register: 'rbenv_installed'
+      ignore_errors: yes
+
     - name: 'rbenv | clone repo'
-      git: 'repo=https://github.com/rbenv/rbenv.git dest={{ rbenv_root }} accept_hostkey=yes'
+      git:
+        repo: 'https://github.com/rbenv/rbenv.git'
+        dest: '{{ rbenv_root }}'
+        accept_hostkey: yes
+      when: 'rbenv_installed is failed'
 
     - name: 'rbenv | check ruby-build installed'
       command: 'test -x {{ rbenv_root }}/plugins/ruby-build'
@@ -151,13 +168,11 @@
       when: 'plugin_installed is failed'
 
     - name: 'rbenv | clone ruby-build repo'
-      git: 'repo=https://github.com/rbenv/ruby-build.git dest={{ rbenv_root }}/plugins/ruby-build accept_hostkey=yes'
+      git:
+        repo: 'https://github.com/rbenv/ruby-build.git'
+        dest: '{{ rbenv_root }}/plugins/ruby-build'
+        accept_hostkey: yes
       when: 'plugin_installed is failed'
-
-    - name: 'rbenv | pull ruby-build repo'
-      shell: |
-        cd {{ rbenv_root }}/plugins/ruby-build
-        git pull origin master
 
     - name: 'rbenv | check ruby {{ ruby_version }} installed'
       shell: 'RBENV_ROOT={{ rbenv_root }} PATH="$RBENV_ROOT/bin:$PATH" rbenv versions | grep {{ ruby_version }}'
@@ -189,6 +204,30 @@
       when: 'ruby_installed is failed'
 
     # ====================================================
+    # Link ruby to root user for CRON
+    # ====================================================
+    - name: 'ruby | check link for CRON'
+      command: 'test -L /usr/bin/ruby'
+      register: 'ruby_linked_for_cron'
+      ignore_errors: yes
+
+    - name: 'ruby | link for CRON'
+      shell: 'ln -s {{ rbenv_root }}/ruby /usr/bin/ruby'
+      when: 'ruby_linked_for_cron is failed'
+
+    # ====================================================
+    # Prepare shared folder
+    # ====================================================
+    - name: 'shared folder | check shared folder'
+      command: 'test -x {{ application }}/shared'
+      register: 'shared_folder_created'
+      ignore_errors: yes
+
+    - name: 'shared folder | create shared directory'
+      shell: 'mkdir -p {{ application }}/shared -m 775 && mkdir -p {{ application }}/shared/config -m 775 && mkdir -p {{ application }}/shared/public -m 775 && chown -R {{ user }}:{{ user }} {{ home }}/apps'
+      when: 'shared_folder_created is failed'
+
+    # ====================================================
     # Create and setup postgresql database
     # ====================================================
     - name: 'postgresql | check user'
@@ -197,21 +236,22 @@
       ignore_errors: yes
 
     - name: 'postgresql | set auth type'
-      copy: 'src=configs/pg_hba.conf dest=/etc/postgresql/16/main/pg_hba.conf owner=postgres group=postgres mode=0644'
+      copy:
+        src: configs/pg_hba.conf
+        dest: /etc/postgresql/16/main/pg_hba.conf
+        owner: postgres
+        group: postgres
+        mode: 0644
       when: 'postgres_login is failed'
 
     - name: 'postgresql | restart service'
       service: name=postgresql state=restarted
       when: 'postgres_login is failed'
 
-    - name: 'postgresql | check shared folder'
-      command: 'test -x {{ application }}/shared'
-      register: 'shared_folder_created'
+    - name: 'postgresql | check database.yml'
+      command: 'test -f {{ application }}/shared/config/database.yml'
+      register: 'database_config_copied'
       ignore_errors: yes
-
-    - name: 'postgresql | create shared directory'
-      shell: 'mkdir -p {{ application }}/shared/config -m 775 && chown -R {{ user }}:{{ user }} {{ home }}/apps'
-      when: 'shared_folder_created is failed'
 
     - name: 'postgresql | copy database.yml'
       template:
@@ -220,11 +260,11 @@
         owner: '{{ user }}'
         group: '{{ user }}'
         mode: '0644'
-      when: 'shared_folder_created is failed'
+      when: 'database_config_copied is failed'
 
     - name: 'postgresql | create database'
       shell: 'createdb -U postgres -O postgres -E UTF8 -l en_US.UTF-8 -T template0 {{ name }}_production'
-      when: 'shared_folder_created is failed'
+      when: 'database_config_copied is failed'
 
     # ====================================================
     # Setup all shared config files, secrets, keys, etc
@@ -257,6 +297,20 @@
         mode: '0644'
       when: 'credentials_key_copied is failed'
 
+    - name: 'sitemap | check sitemap.xml.gz'
+      command: 'test -f {{ application }}/shared/public/sitemap.xml.gz'
+      register: 'sitemap_copied'
+      ignore_errors: yes
+
+    - name: 'sitemap | create empty sitemap'
+      template:
+        src: configs/sitemap.xml.gz
+        dest: '{{ application }}/shared/public/sitemap.xml.gz'
+        owner: '{{ user }}'
+        group: '{{ user }}'
+        mode: '0644'
+      when: 'sitemap_copied is failed'
+
     # ====================================================
     # sudo access without password for deployer
     # ====================================================
@@ -281,7 +335,12 @@
       ignore_errors: yes
 
     - name: 'puma | copy servise config'
-      template: 'src=configs/puma.servise dest=/etc/systemd/system/puma_{{ name }}_production.service owner=root group=root mode=0644'
+      template:
+        src: configs/puma.servise
+        dest: '/etc/systemd/system/puma_{{ name }}_production.service'
+        owner: 'root'
+        group: 'root'
+        mode: '0644'
       when: 'puma_servise_config_copied is failed'
 
     - name: 'puma | start servise'
@@ -294,7 +353,12 @@
       ignore_errors: yes
 
     - name: 'puma | copy app config'
-      template: 'src=configs/puma.rb dest={{ application }}/shared/config/puma.rb owner=root group=root mode=0644'
+      template:
+        src: configs/puma.rb
+        dest: '{{ application }}/shared/config/puma.rb'
+        owner: '{{ user }}'
+        group: '{{ user }}'
+        mode: '0644'
       when: 'puma_app_config_copied is failed'
 
     # ====================================================
@@ -310,7 +374,12 @@
       when: 'nginx_config_copied is failed'
 
     - name: 'nginx | copy config'
-      template: 'src=configs/nginx.conf dest=/etc/nginx/sites-enabled/{{ name }}.conf owner=root group=root mode=0644'
+      template:
+        src: configs/nginx.conf
+        dest: '/etc/nginx/sites-enabled/{{ name }}.conf'
+        owner: 'root'
+        group: 'root'
+        mode: '0644'
       when: 'nginx_config_copied is failed'
 
     - name: 'nginx | restart service'
