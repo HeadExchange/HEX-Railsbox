@@ -36,6 +36,31 @@ logout
 git clone git@github.com:HeadExchange/HEX-Railsbox.git
 ```
 
+### Prepare your Rails app
+
+Add this gems to your Gemfile to development group.
+
+```
+gem "capistrano"
+gem "capistrano-rbenv"
+gem "capistrano-rails"
+gem "capistrano-bundler"
+gem "capistrano3-puma"
+gem "capistrano-rake"
+gem "sshkit-sudo"
+```
+
+You could find an example of Capfile and deploy.rb in the examples folder.
+
+Optionnaly you may add this gems.
+
+```
+gem "sitemap_generator"
+gem "whenever", require: false
+```
+
+You could also find sitemap.rb and schedule.rb file examples in the examples folder.
+
 ### Prepare your ssh key
 
 Get the ssh public key you use, copy and paste it to HEX-Railsbox/provision/keys folder
