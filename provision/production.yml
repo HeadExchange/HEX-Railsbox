@@ -329,23 +329,23 @@
     # ====================================================
     # Puma service and app configs setup
     # ====================================================
-    - name: 'puma | check servise config'
+    - name: 'puma | check service config'
       command: 'test -f /etc/systemd/system/puma_{{ name }}_production.service'
-      register: 'puma_servise_config_copied'
+      register: 'puma_service_config_copied'
       ignore_errors: yes
 
-    - name: 'puma | copy servise config'
+    - name: 'puma | copy service config'
       template:
-        src: configs/puma.servise
+        src: configs/puma.service
         dest: '/etc/systemd/system/puma_{{ name }}_production.service'
         owner: 'root'
         group: 'root'
         mode: '0644'
-      when: 'puma_servise_config_copied is failed'
+      when: 'puma_service_config_copied is failed'
 
-    - name: 'puma | start servise'
+    - name: 'puma | start service'
       shell: 'sudo /bin/systemctl start puma_{{ name }}_production'
-      when: 'puma_servise_config_copied is failed'
+      when: 'puma_service_config_copied is failed'
 
     - name: 'puma | check app config'
       command: 'test -f {{ application }}/shared/config/puma.rb'
