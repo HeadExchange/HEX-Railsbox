@@ -104,6 +104,8 @@
           - libpq-dev
           - imagemagick
           - libmagickwand-dev
+          - libvips
+          - jpegoptim
           - nodejs
           - node-gyp
           - npm
@@ -316,9 +318,9 @@
     # ====================================================
     - name: 'sudoers | add rules'
       shell: |
-        echo '%deployer ALL=NOPASSWD:/bin/systemctl --user start {{ name }}_puma_production' >> /etc/sudoers
-        echo '%deployer ALL=NOPASSWD:/bin/systemctl --user stop {{ name }}_puma_production' >> /etc/sudoers
-        echo '%deployer ALL=NOPASSWD:/bin/systemctl --user restart {{ name }}_puma_production' >> /etc/sudoers
+        echo '%deployer ALL=NOPASSWD:/bin/systemctl start {{ name }}_puma_production' >> /etc/sudoers
+        echo '%deployer ALL=NOPASSWD:/bin/systemctl stop {{ name }}_puma_production' >> /etc/sudoers
+        echo '%deployer ALL=NOPASSWD:/bin/systemctl restart {{ name }}_puma_production' >> /etc/sudoers
 
     # ====================================================
     # grant permission to deployer folder for nginx
