@@ -36,6 +36,15 @@ logout
 git clone git@github.com:HeadExchange/HEX-Railsbox.git
 ```
 
+## If you use Puma 6 you should use the branch puma_6
+
+After clone you will need to checkout to puma_6 branch
+
+```bash
+cd HEX-Railsbox
+git checkout puma_6
+```
+
 ### Prepare your Rails app
 
 Add this gems to your Gemfile to development group.
