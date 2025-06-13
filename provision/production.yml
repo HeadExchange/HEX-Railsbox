@@ -32,8 +32,8 @@
   tasks:
     - name: 'ssh | set keep alive settings'
       shell: |
-        echo '  ServerAliveInterval 60' >> /etc/ssh/ssh_config
-        echo '  ServerAliveCountMax 30' >> /etc/ssh/ssh_config
+        echo '  ClientAliveInterval 60' >> /etc/ssh/ssh_config
+        echo '  ClientAliveCountMax 30' >> /etc/ssh/ssh_config
 
     - name: 'ssh | restart ssh service'
       shell: 'systemctl restart ssh'
@@ -112,6 +112,7 @@
           - yarn
           - htop
           - mc
+          - net-tools
         state: present
 
     # ====================================================
