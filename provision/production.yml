@@ -32,8 +32,8 @@
   tasks:
     - name: 'ssh | set keep alive settings'
       shell: |
-        echo '  ServerAliveInterval 60' >> /etc/ssh/ssh_config
-        echo '  ServerAliveCountMax 30' >> /etc/ssh/ssh_config
+        echo '  ClientAliveInterval 60' >> /etc/ssh/ssh_config
+        echo '  ClientAliveCountMax 30' >> /etc/ssh/ssh_config
 
     - name: 'ssh | restart ssh service'
       shell: 'systemctl restart ssh'
@@ -104,12 +104,15 @@
           - libpq-dev
           - imagemagick
           - libmagickwand-dev
+          - libvips
+          - jpegoptim
           - nodejs
           - node-gyp
           - npm
           - yarn
           - htop
           - mc
+          - net-tools
         state: present
 
     # ====================================================
@@ -316,9 +319,9 @@
     # ====================================================
     - name: 'sudoers | add rules'
       shell: |
-        echo '%deployer ALL=NOPASSWD:/bin/systemctl start puma_{{ name }}_production' >> /etc/sudoers
-        echo '%deployer ALL=NOPASSWD:/bin/systemctl stop puma_{{ name }}_production' >> /etc/sudoers
-        echo '%deployer ALL=NOPASSWD:/bin/systemctl restart puma_{{ name }}_production' >> /etc/sudoers
+        echo '%deployer ALL=NOPASSWD:/bin/systemctl start {{ name }}_puma_production' >> /etc/sudoers
+        echo '%deployer ALL=NOPASSWD:/bin/systemctl stop {{ name }}_puma_production' >> /etc/sudoers
+        echo '%deployer ALL=NOPASSWD:/bin/systemctl restart {{ name }}_puma_production' >> /etc/sudoers
 
     # ====================================================
     # grant permission to deployer folder for nginx
@@ -330,21 +333,21 @@
     # Puma service and app configs setup
     # ====================================================
     - name: 'puma | check service config'
-      command: 'test -f /etc/systemd/system/puma_{{ name }}_production.service'
+      command: 'test -f /etc/systemd/system/{{ name }}_puma_production.service'
       register: 'puma_service_config_copied'
       ignore_errors: yes
 
     - name: 'puma | copy service config'
       template:
         src: configs/puma.service
-        dest: '/etc/systemd/system/puma_{{ name }}_production.service'
+        dest: '/etc/systemd/system/{{ name }}_puma_production.service'
         owner: 'root'
         group: 'root'
         mode: '0644'
       when: 'puma_service_config_copied is failed'
 
     - name: 'puma | start service'
-      shell: 'sudo /bin/systemctl start puma_{{ name }}_production'
+      shell: 'sudo /bin/systemctl start {{ name }}_puma_production'
       when: 'puma_service_config_copied is failed'
 
     - name: 'puma | check app config'
