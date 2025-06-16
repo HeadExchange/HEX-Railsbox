@@ -346,10 +346,6 @@
         mode: '0644'
       when: 'puma_service_config_copied is failed'
 
-    - name: 'puma | start service'
-      shell: 'sudo /bin/systemctl start {{ name }}_puma_production'
-      when: 'puma_service_config_copied is failed'
-
     - name: 'puma | check app config'
       command: 'test -f {{ application }}/shared/config/puma.rb'
       register: 'puma_app_config_copied'
@@ -363,6 +359,18 @@
         group: '{{ user }}'
         mode: '0644'
       when: 'puma_app_config_copied is failed'
+
+    - name: 'puma | enable service'
+      shell: 'sudo systemctl enable {{ name }}_puma_production.service'
+      when: 'puma_app_config_copied is failed'
+
+    - name: 'puma | link service'
+      shell: 'sudo ln -s /etc/systemd/system/{{ name }}_puma_production.service /etc/systemd/user/{{ name }}_puma_production.service'
+      when: 'puma_app_config_copied is failed'
+
+    - name: 'puma | start service'
+      shell: 'sudo /bin/systemctl start {{ name }}_puma_production'
+      when: 'puma_service_config_copied is failed'
 
     # ====================================================
     # NGINX config setup
