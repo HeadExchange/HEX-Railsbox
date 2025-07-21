@@ -99,8 +99,6 @@
           - git
           - nginx
           - redis-server
-          - postgresql
-          - postgresql-contrib
           - libpq-dev
           - imagemagick
           - libmagickwand-dev
@@ -114,6 +112,9 @@
           - mc
           - net-tools
         state: present
+
+        # - postgresql
+        # - postgresql-contrib
 
     # ====================================================
     # Set yarn and npm globally
@@ -233,41 +234,41 @@
     # ====================================================
     # Create and setup postgresql database
     # ====================================================
-    - name: 'postgresql | check user'
-      shell: 'psql -U postgres -c "\copyright"'
-      register: 'postgres_login'
-      ignore_errors: yes
+    # - name: 'postgresql | check user'
+    #   shell: 'psql -U postgres -c "\copyright"'
+    #   register: 'postgres_login'
+    #   ignore_errors: yes
 
-    - name: 'postgresql | set auth type'
-      copy:
-        src: configs/pg_hba.conf
-        dest: /etc/postgresql/16/main/pg_hba.conf
-        owner: postgres
-        group: postgres
-        mode: 0644
-      when: 'postgres_login is failed'
+    # - name: 'postgresql | set auth type'
+    #   copy:
+    #     src: configs/pg_hba.conf
+    #     dest: /etc/postgresql/16/main/pg_hba.conf
+    #     owner: postgres
+    #     group: postgres
+    #     mode: 0644
+    #   when: 'postgres_login is failed'
 
-    - name: 'postgresql | restart service'
-      service: name=postgresql state=restarted
-      when: 'postgres_login is failed'
+    # - name: 'postgresql | restart service'
+    #   service: name=postgresql state=restarted
+    #   when: 'postgres_login is failed'
 
-    - name: 'postgresql | check database.yml'
-      command: 'test -f {{ application }}/shared/config/database.yml'
-      register: 'database_config_copied'
-      ignore_errors: yes
+    # - name: 'postgresql | check database.yml'
+    #   command: 'test -f {{ application }}/shared/config/database.yml'
+    #   register: 'database_config_copied'
+    #   ignore_errors: yes
 
-    - name: 'postgresql | copy database.yml'
-      template:
-        src: configs/database.yml
-        dest: '{{ application }}/shared/config/database.yml'
-        owner: '{{ user }}'
-        group: '{{ user }}'
-        mode: '0644'
-      when: 'database_config_copied is failed'
+    # - name: 'postgresql | copy database.yml'
+    #   template:
+    #     src: configs/database.yml
+    #     dest: '{{ application }}/shared/config/database.yml'
+    #     owner: '{{ user }}'
+    #     group: '{{ user }}'
+    #     mode: '0644'
+    #   when: 'database_config_copied is failed'
 
-    - name: 'postgresql | create database'
-      shell: 'createdb -U postgres -O postgres -E UTF8 -l en_US.UTF-8 -T template0 {{ name }}_production'
-      when: 'database_config_copied is failed'
+    # - name: 'postgresql | create database'
+    #   shell: 'createdb -U postgres -O postgres -E UTF8 -l en_US.UTF-8 -T template0 {{ name }}_production'
+    #   when: 'database_config_copied is failed'
 
     # ====================================================
     # Setup all shared config files, secrets, keys, etc
