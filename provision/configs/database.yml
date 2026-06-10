@@ -1,6 +1,24 @@
 production:
-  adapter: postgresql
-  username: postgres
-  encoding: utf8
-  pool: 8
-  database: '{{ name }}_production'
+  primary:
+    adapter: sqlite3
+    pool: 5
+    timeout: 5000
+    database: storage/production.sqlite3
+  cache:
+    adapter: sqlite3
+    pool: 5
+    timeout: 5000
+    database: storage/production_cache.sqlite3
+    migrations_paths: db/cache_migrate
+  queue:
+    adapter: sqlite3
+    pool: 5
+    timeout: 5000
+    database: storage/production_queue.sqlite3
+    migrations_paths: db/queue_migrate
+  cable:
+    adapter: sqlite3
+    pool: 5
+    timeout: 5000
+    database: storage/production_cable.sqlite3
+    migrations_paths: db/cable_migrate

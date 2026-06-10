@@ -6,15 +6,15 @@
   vars_prompt:
     - name: 'ruby_version'
       prompt: 'Ruby version'
-      default: '3.2.4'
+      default: '3.4.9'
       private: no
     - name: 'name'
       prompt: "Application name (one-word, can use '_' symbol)"
-      default: 'adc2024'
+      default: 'app'
       private: no
     - name: 'domain'
       prompt: 'Site domain'
-      default: '81.177.48.90'
+      default: 'domain'
       private: no
     - name: 'swapfile_size'
       prompt: 'Swapfile Size'
@@ -30,57 +30,62 @@
     swapfile_use_dd: False
 
   tasks:
+    # ====================================================
+    # SSHD Config Update
+    # ====================================================
     - name: 'ssh | set keep alive settings'
       shell: |
-        echo '  ServerAliveInterval 60' >> /etc/ssh/ssh_config
-        echo '  ServerAliveCountMax 30' >> /etc/ssh/ssh_config
+        echo 'ClientAliveInterval 60' >> /etc/ssh/sshd_config
+        echo 'ClientAliveCountMax 30' >> /etc/ssh/sshd_config
+        echo 'PasswordAuthentication no' >> /etc/ssh/sshd_config
+        echo 'PermitRootLogin prohibit-password' >> /etc/ssh/sshd_config
 
     - name: 'ssh | restart ssh service'
-      shell: 'systemctl restart ssh'
+      shell: 'systemctl restart sshd'
 
     # ====================================================
     # Swapfile
     # ====================================================
-    - name: Write swapfile
-      command: |
-        {% if swapfile_use_dd %}
-        dd if=/dev/zero of={{ swapfile_location }} bs=1M count={{ swapfile_size }} creates={{ swapfile_location }}
-        {% else %}
-        fallocate -l {{ swapfile_size }} {{ swapfile_location }} creates={{ swapfile_location }}
-        {% endif %}
-      register: write_swapfile
-      when: swapfile_size != false
+    # - name: Write swapfile
+    #   command: |
+    #     {% if swapfile_use_dd %}
+    #     dd if=/dev/zero of={{ swapfile_location }} bs=1M count={{ swapfile_size }} creates={{ swapfile_location }}
+    #     {% else %}
+    #     fallocate -l {{ swapfile_size }} {{ swapfile_location }} creates={{ swapfile_location }}
+    #     {% endif %}
+    #   register: write_swapfile
+    #   when: swapfile_size != false
 
-    - name: Set swapfile permissions
-      file: path={{ swapfile_location }} mode=600
-      when: swapfile_size != false
+    # - name: Set swapfile permissions
+    #   file: path={{ swapfile_location }} mode=600
+    #   when: swapfile_size != false
 
-    - name: Create swapfile
-      command: mkswap {{ swapfile_location }}
-      register: create_swapfile
-      when: swapfile_size != false and write_swapfile.changed
+    # - name: Create swapfile
+    #   command: mkswap {{ swapfile_location }}
+    #   register: create_swapfile
+    #   when: swapfile_size != false and write_swapfile.changed
 
-    - name: Enable swapfile
-      command: swapon {{ swapfile_location }}
-      when: swapfile_size != false and create_swapfile.changed
+    # - name: Enable swapfile
+    #   command: swapon {{ swapfile_location }}
+    #   when: swapfile_size != false and create_swapfile.changed
 
-    - name: Add swapfile to /etc/fstab
-      lineinfile: dest=/etc/fstab line="{{ swapfile_location }}   none    swap    sw    0   0" state=present
-      when: swapfile_size != false
+    # - name: Add swapfile to /etc/fstab
+    #   lineinfile: dest=/etc/fstab line="{{ swapfile_location }}   none    swap    sw    0   0" state=present
+    #   when: swapfile_size != false
 
-    - name: Configure vm.swappiness
-      sysctl:
-        name: vm.swappiness
-        value: 10
-        state: present
-        reload: true
+    # - name: Configure vm.swappiness
+    #   sysctl:
+    #     name: vm.swappiness
+    #     value: 10
+    #     state: present
+    #     reload: true
 
-    - name: Configure vm.vfs_cache_pressure
-      sysctl:
-        name: vm.vfs_cache_pressure
-        value: 50
-        state: present
-        reload: true
+    # - name: Configure vm.vfs_cache_pressure
+    #   sysctl:
+    #     name: vm.vfs_cache_pressure
+    #     value: 50
+    #     state: present
+    #     reload: true
 
     # ====================================================
     # Ubuntu update and packages installation
@@ -93,43 +98,37 @@
         pkg:
           - build-essential
           - libyaml-dev
-          - libreadline6-dev
+          - libreadline-dev
           - zlib1g-dev
           - curl
           - git
           - nginx
-          - redis-server
           - libpq-dev
-          - imagemagick
-          - libmagickwand-dev
-          - libvips
+          - libvips42t64
           - jpegoptim
+          - optipng
+          - pngquant
           - nodejs
           - node-gyp
           - npm
-          - yarn
           - htop
           - mc
-          - net-tools
         state: present
-
-        # - postgresql
-        # - postgresql-contrib
 
     # ====================================================
     # Set yarn and npm globally
     # ====================================================
-    - name: 'yarn | install globally'
-      shell: 'npm install yarn -g'
+    # - name: 'yarn | install globally'
+    #   shell: 'npm install yarn -g'
 
-    - name: 'npm cache clean'
-      shell: 'sudo npm cache clean -f'
+    # - name: 'npm cache clean'
+    #   shell: 'sudo npm cache clean -f'
 
-    - name: 'npm install n'
-      shell: 'sudo npm install -g n'
+    # - name: 'npm install n'
+    #   shell: 'sudo npm install -g n'
 
-    - name: 'upgrade node'
-      shell: 'sudo n stable'
+    # - name: 'upgrade node'
+    #   shell: 'sudo n stable'
 
     # ====================================================
     # Create and setup a deployer user
@@ -140,8 +139,8 @@
     - name: 'account | copy authorized keys'
       shell: 'mkdir -p {{ home }}/.ssh -m 700 && cp /root/.ssh/authorized_keys {{ home }}/.ssh && chown -R {{ user }}:{{ user }} {{ home }}/.ssh'
 
-    - name: 'account | copy ssh public key'
-      authorized_key: user={{ user }} key="{{ lookup('file', 'keys/id_rsa.pub') }}"
+    # - name: 'account | copy ssh public key'
+    # authorized_key: user={{ user }} key="{{ lookup('file', 'keys/id_rsa.pub') }}"
 
     # ====================================================
     # rbenv, ruby-build and ruby setup
@@ -195,9 +194,9 @@
       shell: 'RBENV_ROOT={{ rbenv_root }} PATH="$RBENV_ROOT/bin:$PATH" rbenv rehash'
       when: 'ruby_installed is failed'
 
-    - name: 'rbenv | create .gemrc'
-      lineinfile: 'dest={{ home }}/.gemrc owner={{ user }} group={{ user }} mode=0644 line="gem: --no-ri --no-rdoc" create=yes'
-      when: 'ruby_installed is failed'
+    # - name: 'rbenv | create .gemrc'
+    #   lineinfile: 'dest={{ home }}/.gemrc owner={{ user }} group={{ user }} mode=0644 line="gem: --no-ri --no-rdoc" create=yes'
+    #   when: 'ruby_installed is failed'
 
     - name: 'ruby | install bundler'
       shell: 'RBENV_ROOT={{ rbenv_root }} PATH="$RBENV_ROOT/bin:$PATH" rbenv exec gem install bundler'
@@ -228,7 +227,7 @@
       ignore_errors: yes
 
     - name: 'shared folder | create shared directory'
-      shell: 'mkdir -p {{ application }}/shared -m 775 && mkdir -p {{ application }}/shared/config -m 775 && mkdir -p {{ application }}/shared/public -m 775 && chown -R {{ user }}:{{ user }} {{ home }}/apps'
+      shell: 'mkdir -p {{ application }}/shared -m 775 && mkdir -p {{ application }}/shared/config -m 775 && mkdir -p {{ application }}/shared/log -m 775 && mkdir -p {{ application }}/shared/storage -m 775 && mkdir -p {{ application }}/shared/tmp -m 775 && mkdir -p {{ application }}/shared/public -m 775 && mkdir -p {{ application }}/shared/vendor -m 775 && mkdir -p {{ application }}/shared/tmp/cache -m 775 && mkdir -p {{ application }}/shared/tmp/pids -m 775 && mkdir -p {{ application }}/shared/tmp/sockets -m 775 && mkdir -p {{ application }}/shared/public/system -m 775 && mkdir -p {{ application }}/shared/public/uploads -m 775 && chown -R {{ user }}:{{ user }} {{ home }}/apps'
       when: 'shared_folder_created is failed'
 
     # ====================================================
@@ -287,33 +286,47 @@
         mode: '0644'
       when: 'mater_key_copied is failed'
 
-    - name: 'secrets | check credentials'
-      command: 'test -f {{ application }}/shared/config/credentials.yml.enc'
-      register: 'credentials_key_copied'
+    - name: 'database | check database.yml'
+      command: 'test -f {{ application }}/shared/config/database.yml'
+      register: 'database_config_copied'
       ignore_errors: yes
 
-    - name: 'secrets | copy credentials'
+    - name: 'database | copy database.yml'
       template:
-        src: ../../config/credentials.yml.enc
-        dest: '{{ application }}/shared/config/credentials.yml.enc'
+        src: configs/database.yml
+        dest: '{{ application }}/shared/config/database.yml'
         owner: '{{ user }}'
         group: '{{ user }}'
         mode: '0644'
-      when: 'credentials_key_copied is failed'
+      when: 'database_config_copied is failed'
 
-    - name: 'sitemap | check sitemap.xml.gz'
-      command: 'test -f {{ application }}/shared/public/sitemap.xml.gz'
-      register: 'sitemap_copied'
-      ignore_errors: yes
+    # - name: 'secrets | check credentials'
+    #   command: 'test -f {{ application }}/shared/config/credentials.yml.enc'
+    #   register: 'credentials_key_copied'
+    #   ignore_errors: yes
 
-    - name: 'sitemap | create empty sitemap'
-      template:
-        src: configs/sitemap.xml.gz
-        dest: '{{ application }}/shared/public/sitemap.xml.gz'
-        owner: '{{ user }}'
-        group: '{{ user }}'
-        mode: '0644'
-      when: 'sitemap_copied is failed'
+    # - name: 'secrets | copy credentials'
+    #   template:
+    #     src: ../../config/credentials.yml.enc
+    #     dest: '{{ application }}/shared/config/credentials.yml.enc'
+    #     owner: '{{ user }}'
+    #     group: '{{ user }}'
+    #     mode: '0644'
+    #   when: 'credentials_key_copied is failed'
+
+    # - name: 'sitemap | check sitemap.xml.gz'
+    #   command: 'test -f {{ application }}/shared/public/sitemap.xml.gz'
+    #   register: 'sitemap_copied'
+    #   ignore_errors: yes
+
+    # - name: 'sitemap | create empty sitemap'
+    #   template:
+    #     src: configs/sitemap.xml.gz
+    #     dest: '{{ application }}/shared/public/sitemap.xml.gz'
+    #     owner: '{{ user }}'
+    #     group: '{{ user }}'
+    #     mode: '0644'
+    #   when: 'sitemap_copied is failed'
 
     # ====================================================
     # sudo access without password for deployer
